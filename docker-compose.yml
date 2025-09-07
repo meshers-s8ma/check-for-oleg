@@ -1,0 +1,28 @@
+services:
+  web:
+    build: .
+    container_name: product_tracker_app_dev
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - FLASK_ENV=development
+    env_file:
+      - .env
+    depends_on:
+      - db
+    # Запускаем через production-ready сервер Gunicorn с перезагрузкой для стабильных WebSocket
+    command: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:5000 wsgi:app --reload
+
+  db:
+    image: postgres:13
+    container_name: product_tracker_db_dev
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data/
+    env_file:
+      - .env
+
+volumes:
+  postgres_data_dev:

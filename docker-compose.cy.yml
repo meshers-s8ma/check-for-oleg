@@ -1,0 +1,52 @@
+
+
+# Этот файл предназначен для запуска Cypress-тестов в изолированном окружении.
+# Он расширяет ваш основной docker-compose.yml, добавляя сервис для Cypress.
+
+services:
+  # Мы расширяем существующий сервис web, чтобы не дублировать его конфигурацию
+  web:
+    # Важно! Мы используем docker-compose.yml для разработки,
+    # так как он предоставляет "живую" перезагрузку, что удобно для тестов.
+    extends:
+      file: docker-compose.yml
+      service: web
+    depends_on:
+      - db
+
+  # Расширяем сервис db
+  db:
+    extends:
+      file: docker-compose.yml
+      service: db
+    # Убеждаемся, что база данных готова перед запуском тестов
+    healthcheck:
+      # --- ИЗМЕНЕНИЕ: Добавлен флаг `-d $$POSTGRES_DB` ---
+      # Явно указываем утилите pg_isready, к какой базе данных подключаться для проверки.
+      # Также исправлена опечатка POSTGES -> POSTGRES.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  # Новый сервис специально для запуска Cypress
+  cypress:
+    # Используем официальный образ Cypress с предустановленными браузерами и зависимостями
+    image: cypress/included:13.13.0
+    container_name: product_tracker_cypress
+    depends_on:
+      - web # Cypress не начнет работу, пока веб-приложение не будет запущено
+    environment:
+      # Передаем базовый URL внутрь контейнера Cypress
+      - CYPRESS_baseUrl=http://web:5000
+    working_dir: /e-2-e
+    volumes:
+      # Монтируем папку с тестами, конфигом и результатами
+      - ./cypress:/e-2-e/cypress
+      - ./cypress.config.js:/e-2-e/cypress.config.js
+
+# Объявляем том, который используется сервисом `db` из `docker-compose.yml`,
+# чтобы этот файл был самодостаточным.
+volumes:
+  postgres_data_dev:
